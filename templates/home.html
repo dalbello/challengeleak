@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}ChallengeLeak — Detect Cloudflare Rules Leaking Revenue{% endblock %}
+{% block meta_description %}ChallengeLeak maps Cloudflare challenge friction to conversion loss and estimates revenue-at-risk per rule. Built for growth + security teams.{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-14">
+    <div class="text-center mb-10">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">Detect when Cloudflare challenges are leaking paid revenue</h1>
+        <p class="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">ChallengeLeak correlates challenge friction with conversion drop and attribution loss, then estimates <strong>revenue-at-risk per rule</strong>.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-8 mb-12">
+        <div class="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
+            <h2 class="text-xl font-semibold mb-4">Run Impact Snapshot</h2>
+            <form id="impact-form" method="post" class="space-y-4">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Monthly sessions</label>
+                        <input name="monthly_sessions" type="number" min="1" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="150000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Baseline CVR (%)</label>
+                        <input name="baseline_cvr" type="number" step="0.01" min="0.01" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="2.7">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Avg order value ($)</label>
+                        <input name="avg_order_value" type="number" step="0.01" min="1" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="180">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Challenge rate (%)</label>
+                        <input name="challenge_rate" type="number" step="0.01" min="0" max="100" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="22">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Challenge solve rate (%)</label>
+                        <input name="solve_rate" type="number" step="0.01" min="0" max="100" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="68">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Blocked human rate (%)</label>
+                        <input name="blocked_human_rate" type="number" step="0.01" min="0" max="100" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="1.4">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium mb-2">Conversion drop after rule changes (%)</label>
+                        <input name="conversion_drop" type="number" step="0.01" min="0" max="100" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="19">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Rules to score (optional, one per line)</label>
+                    <p class="text-xs text-slate-500 mb-2">Format: <code>Rule Name | Traffic Share % | Conversion Impact % | Action</code></p>
+                    <textarea name="rules" rows="5" class="w-full px-4 py-3 border border-slate-300 rounded-lg font-mono text-sm" placeholder="bot-score-20-block | 42 | 28 | block\nmanaged-challenge-paid-traffic | 58 | 14 | managed_challenge"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-emerald-700 transition">Calculate Revenue at Risk</button>
+            </form>
+        </div>
+
+        <div class="bg-slate-900 rounded-2xl p-6 text-slate-200">
+            <h3 class="font-semibold text-lg mb-3">Built for growth + security teams</h3>
+            <ul class="space-y-3 text-sm">
+                <li>✅ Quantify business impact of challenge friction</li>
+                <li>✅ Prioritize rules by estimated revenue risk</li>
+                <li>✅ Catch false positives before they tank ROAS</li>
+                <li>✅ Build a shared source of truth for SecOps + Marketing</li>
+            </ul>
+            <div class="mt-6 p-4 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                <p class="font-semibold text-emerald-300">Private beta waitlist</p>
+                <p class="mt-1 text-slate-300">ChallengeLeak is in validation mode. Join the waitlist to get API access, anomaly alerts, and Cloudflare rule recommendations.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="results" class="hidden bg-white rounded-2xl shadow-lg p-8 mb-12 border border-slate-200">
+        <h2 class="text-2xl font-bold mb-4">Impact Snapshot</h2>
+        <div id="results-content"></div>
+    </div>
+
+    <div id="waitlist-card" class="hidden bg-white rounded-2xl shadow-lg p-8 mb-14 border border-slate-200">
+        <h2 class="text-2xl font-bold mb-2">Join ChallengeLeak Beta</h2>
+        <p class="text-slate-600 mb-5">We'll invite teams with the highest measured impact first.</p>
+        <form id="waitlist-form" class="grid md:grid-cols-2 gap-4">
+            {% csrf_token %}
+            <input type="hidden" name="risk_score" id="waitlist-risk-score">
+            <input type="hidden" name="risk_label" id="waitlist-risk-label">
+            <input type="hidden" name="revenue_risk" id="waitlist-revenue-risk">
+            <input type="hidden" name="monthly_sessions" id="waitlist-monthly-sessions">
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium mb-2">Work email</label>
+                <input type="email" name="email" required class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="you@company.com">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Company (optional)</label>
+                <input type="text" name="company" class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="Acme Security">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Role (optional)</label>
+                <input type="text" name="role" class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="Growth Engineer">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium mb-2">Stack (optional)</label>
+                <input type="text" name="stack" class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="Cloudflare + GA4 + Meta + Shopify">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium mb-2">Biggest pain (optional)</label>
+                <textarea name="biggest_pain" rows="3" class="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="Example: challenge spikes on paid mobile traffic cause attribution gaps and checkout drop"></textarea>
+            </div>
+            <div class="md:col-span-2">
+                <button type="submit" class="w-full bg-slate-900 text-white py-3 px-6 rounded-lg font-semibold hover:bg-slate-800 transition">Join Waitlist</button>
+            </div>
+        </form>
+        <p id="waitlist-message" class="text-sm mt-4"></p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-8 mb-16">
+        <div class="text-center p-6 bg-white rounded-xl border border-slate-200">
+            <div class="text-4xl mb-3">💸</div>
+            <h3 class="font-semibold text-lg mb-2">Revenue-at-Risk Timeline</h3>
+            <p class="text-slate-600">Convert security frictions into dollars so rule decisions become business decisions.</p>
+        </div>
+        <div class="text-center p-6 bg-white rounded-xl border border-slate-200">
+            <div class="text-4xl mb-3">🧭</div>
+            <h3 class="font-semibold text-lg mb-2">Rule-Level Attribution</h3>
+            <p class="text-slate-600">See which specific rules and actions correlate with conversion and ROAS losses.</p>
+        </div>
+        <div class="text-center p-6 bg-white rounded-xl border border-slate-200">
+            <div class="text-4xl mb-3">🛠️</div>
+            <h3 class="font-semibold text-lg mb-2">Safer Patch Suggestions</h3>
+            <p class="text-slate-600">Get practical mitigation moves before rolling back your entire security posture.</p>
+        </div>
+    </div>
+
+    <div class="mb-16">
+        <h2 class="text-3xl font-bold text-center mb-8">Frequently Asked Questions</h2>
+        <div class="space-y-4 max-w-4xl mx-auto">
+            <details class="bg-white rounded-lg shadow p-4 border border-slate-200">
+                <summary class="font-semibold cursor-pointer">Is this just another AI wrapper?</summary>
+                <p class="mt-2 text-slate-600">No. The snapshot uses deterministic risk formulas and rule weighting, not prompt-only output.</p>
+            </details>
+            <details class="bg-white rounded-lg shadow p-4 border border-slate-200">
+                <summary class="font-semibold cursor-pointer">Who is this for?</summary>
+                <p class="mt-2 text-slate-600">Teams running paid traffic behind Cloudflare where security actions can quietly hurt conversion or attribution.</p>
+            </details>
+            <details class="bg-white rounded-lg shadow p-4 border border-slate-200">
+                <summary class="font-semibold cursor-pointer">What happens after I join?</summary>
+                <p class="mt-2 text-slate-600">You'll get early API access and private beta invites when rule-level monitors go live.</p>
+            </details>
+        </div>
+    </div>
+</div>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is this just another AI wrapper?",
+      "acceptedAnswer": {"@type": "Answer", "text": "No. The snapshot uses deterministic risk formulas and rule weighting, not prompt-only output."}
+    },
+    {
+      "@type": "Question",
+      "name": "Who is this for?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Teams running paid traffic behind Cloudflare where security actions can quietly hurt conversion or attribution."}
+    },
+    {
+      "@type": "Question",
+      "name": "What happens after I join?",
+      "acceptedAnswer": {"@type": "Answer", "text": "You'll get early API access and private beta invites when rule-level monitors go live."}
+    }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const impactForm = document.getElementById('impact-form');
+  const waitlistForm = document.getElementById('waitlist-form');
+  const results = document.getElementById('results');
+  const resultsContent = document.getElementById('results-content');
+  const waitlistCard = document.getElementById('waitlist-card');
+  const waitlistMessage = document.getElementById('waitlist-message');
+
+  impactForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(impactForm);
+
+    results.classList.remove('hidden');
+    resultsContent.innerHTML = '<p class="text-slate-600">Calculating impact...</p>';
+
+    let res;
+    try {
+      res = await fetch('/api/process/', {
+        method: 'POST',
+        body: formData,
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+    } catch (_) {
+      resultsContent.innerHTML = '<p class="text-red-600">Network error while calculating impact.</p>';
+      return;
+    }
+
+    const data = await res.json();
+    if (!res.ok || data.status !== 'ok') {
+      resultsContent.innerHTML = `<p class="text-red-600">${data.message || 'Could not calculate impact.'}</p>`;
+      return;
+    }
+
+    waitlistCard.classList.remove('hidden');
+    document.getElementById('waitlist-risk-score').value = data.score;
+    document.getElementById('waitlist-risk-label').value = data.risk;
+    document.getElementById('waitlist-revenue-risk').value = data.revenue_at_risk;
+    document.getElementById('waitlist-monthly-sessions').value = data.assumptions.monthly_sessions;
+
+    const ruleRows = data.top_rules.map((r) => `
+      <tr class="border-t">
+        <td class="py-2 pr-3 text-sm">${r.rule}</td>
+        <td class="py-2 pr-3 text-sm">${r.action}</td>
+        <td class="py-2 pr-3 text-sm">${r.traffic_share}%</td>
+        <td class="py-2 text-sm font-semibold">$${r.revenue_at_risk.toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    const recs = data.recommendations.map((item) => `<li>${item}</li>`).join('');
+
+    resultsContent.innerHTML = `
+      <div class="grid md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-slate-50 rounded-lg border p-4">
+          <p class="text-xs uppercase text-slate-500">Risk score</p>
+          <p class="text-3xl font-bold">${data.score}/100</p>
+        </div>
+        <div class="bg-slate-50 rounded-lg border p-4">
+          <p class="text-xs uppercase text-slate-500">Risk level</p>
+          <p class="text-2xl font-semibold capitalize">${data.risk}</p>
+        </div>
+        <div class="bg-slate-50 rounded-lg border p-4">
+          <p class="text-xs uppercase text-slate-500">At-risk sessions</p>
+          <p class="text-2xl font-semibold">${data.at_risk_sessions.toLocaleString()}</p>
+        </div>
+        <div class="bg-slate-50 rounded-lg border p-4">
+          <p class="text-xs uppercase text-slate-500">Revenue at risk</p>
+          <p class="text-2xl font-semibold">$${data.revenue_at_risk.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="font-semibold mb-2">Top at-risk rules</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="text-xs uppercase text-slate-500 border-b">
+                <th class="py-2 pr-3">Rule</th>
+                <th class="py-2 pr-3">Action</th>
+                <th class="py-2 pr-3">Traffic share</th>
+                <th class="py-2">Revenue risk</th>
+              </tr>
+            </thead>
+            <tbody>${ruleRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-2">Suggested fixes</h3>
+        <ul class="list-disc pl-6 text-sm text-slate-700 space-y-1">${recs}</ul>
+      </div>
+    `;
+  });
+
+  waitlistForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    waitlistMessage.textContent = 'Saving your spot...';
+    waitlistMessage.className = 'text-sm mt-4 text-slate-600';
+
+    const res = await fetch('/api/waitlist/', {
+      method: 'POST',
+      body: new FormData(waitlistForm),
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+
+    const payload = await res.json();
+    if (!res.ok || payload.status !== 'ok') {
+      waitlistMessage.textContent = payload.message || 'Could not save signup.';
+      waitlistMessage.className = 'text-sm mt-4 text-red-600';
+      return;
+    }
+
+    waitlistMessage.textContent = payload.message;
+    waitlistMessage.className = 'text-sm mt-4 text-emerald-700';
+    waitlistForm.reset();
+  });
+</script>
+{% endblock %}
